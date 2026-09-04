@@ -1,0 +1,244 @@
+# API'ni qo'lda sinash uchun so'rovlar to'plami.
+#
+# VS Code'da "REST Client" (humao.rest-client) kengaytmasini o'rnating —
+# har bir so'rov ustida "Send Request" tugmasi paydo bo'ladi.
+# JetBrains IDE'larida bu format qutidan chiqadi.
+#
+# Tartib muhim: avval Login'ni yuboring, token o'zi keyingi so'rovlarga o'tadi.
+
+@host = http://localhost:4000
+@api = {{host}}/api
+
+### Server tirikmi
+GET {{host}}/health
+
+### Endpointlar ro'yxati
+GET {{api}}/docs
+
+
+# ─────────────────────────────  AUTH  ─────────────────────────────
+
+### Login — oddiy foydalanuvchi  (AVVAL SHUNI YUBORING)
+# @name login
+POST {{api}}/auth/login
+Content-Type: application/json
+
+{ "email": "ali@example.uz", "password": "user123" }
+
+###
+@token = {{login.response.body.accessToken}}
+@refresh = {{login.response.body.refreshToken}}
+
+### Login — admin
+# @name adminLogin
+POST {{api}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@example.uz", "password": "admin123" }
+
+###
+@adminToken = {{adminLogin.response.body.accessToken}}
+
+### Ro'yxatdan o'tish
+POST {{api}}/auth/register
+Content-Type: application/json
+
+{ "name": "Yangi Foydalanuvchi", "email": "yangi@example.uz", "password": "parol123" }
+
+### Men kimman
+GET {{api}}/auth/me
+Authorization: Bearer {{token}}
+
+### Token yangilash (eski refresh token o'ladi!)
+POST {{api}}/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{refresh}}" }
+
+
+# ──────────────────────────  MAHSULOTLAR  ──────────────────────────
+
+### Ro'yxat
+GET {{api}}/products?limit=5
+
+### Qidiruv
+GET {{api}}/products?search=iphone
+
+### Kategoriya + narx + saralash
+GET {{api}}/products?category=audio&maxPrice=2000000&sort=price_asc
+
+### Bir nechta kategoriya va brend
+GET {{api}}/products?category=telefonlar,noutbuklar&brand=Apple,Samsung
+
+### 2-sahifa
+GET {{api}}/products?page=2&limit=12
+
+### Filtr paneli uchun ma'lumot
+GET {{api}}/products/filters
+
+### Bitta mahsulot (slug bilan) + related
+GET {{api}}/products/airpods-pro-2
+
+### Kategoriyalar
+GET {{api}}/categories
+
+
+# ───────────────────────────  SHARHLAR  ───────────────────────────
+# Diqqat: bu yerda slug emas, ID kerak. Yuqoridagi so'rovdan id'ni ko'chiring.
+
+@productId = PASTE_PRODUCT_ID
+
+### Mahsulot sharhlari
+GET {{api}}/products/{{productId}}/reviews
+
+### Sharh qoldirish
+POST {{api}}/products/{{productId}}/reviews
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "rating": 5, "comment": "Juda yaxshi mahsulot, tavsiya qilaman" }
+
+
+# ────────────────────────────  SAVAT  ────────────────────────────
+
+### Savatni ko'rish
+GET {{api}}/cart
+Authorization: Bearer {{token}}
+
+### Savatga qo'shish
+POST {{api}}/cart
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "productId": "{{productId}}", "quantity": 2 }
+
+### Sonini o'zgartirish  (itemId — yuqoridagi javobdagi items[0].id)
+PATCH {{api}}/cart/PASTE_ITEM_ID
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "quantity": 3 }
+
+### Savatni bo'shatish
+DELETE {{api}}/cart
+Authorization: Bearer {{token}}
+
+
+# ──────────────────────────  BUYURTMALAR  ──────────────────────────
+
+### Buyurtma berish (savat bo'sh bo'lmasin!)
+POST {{api}}/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fullName": "Ali Valiyev",
+  "phone": "+998901234567",
+  "address": "Toshkent sh., Yunusobod 4-kvartal, 12-uy",
+  "note": "Kechqurun qo'ng'iroq qiling"
+}
+
+### Mening buyurtmalarim
+GET {{api}}/orders
+Authorization: Bearer {{token}}
+
+### Buyurtmani bekor qilish (faqat PENDING)
+POST {{api}}/orders/PASTE_ORDER_ID/cancel
+Authorization: Bearer {{token}}
+
+
+# ────────────────────────────  ADMIN  ────────────────────────────
+
+### Dashboard statistikasi
+GET {{api}}/admin/stats
+Authorization: Bearer {{adminToken}}
+
+### Barcha buyurtmalar
+GET {{api}}/admin/orders?limit=5
+Authorization: Bearer {{adminToken}}
+
+### Buyurtma statusini o'zgartirish
+PATCH {{api}}/admin/orders/PASTE_ORDER_ID/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "status": "SHIPPED" }
+
+### Foydalanuvchilar
+GET {{api}}/admin/users
+Authorization: Bearer {{adminToken}}
+
+### Yangi mahsulot (categoryId'ni /api/categories dan oling)
+POST {{api}}/products
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "title": "Sinov mahsuloti",
+  "description": "Bu qo'lda sinash uchun yaratilgan mahsulot",
+  "price": 250000,
+  "stock": 10,
+  "image": "https://picsum.photos/seed/sinov/800/800",
+  "images": [],
+  "categoryId": "PASTE_CATEGORY_ID"
+}
+
+
+# ────────────────────  QIYINCHILIK REJIMI  ────────────────────
+
+### Hozirgi sozlamalar
+GET {{api}}/__chaos
+
+### O'chirish — tinch ishlash uchun
+POST {{api}}/__chaos
+Content-Type: application/json
+
+{ "delayMs": 0, "failRate": 0 }
+
+### Standart holat
+POST {{api}}/__chaos
+Content-Type: application/json
+
+{ "delayMs": 1000, "failRate": 0.15 }
+
+### Qattiq rejim — 2-kun uchun
+POST {{api}}/__chaos
+Content-Type: application/json
+
+{ "delayMs": 2000, "failRate": 0.3 }
+
+### Ataylab 500
+GET {{api}}/products?__fail=500
+
+### Ataylab 401 (refresh oqimini sinash)
+GET {{api}}/cart?__fail=401
+Authorization: Bearer {{token}}
+
+### Ataylab timeout — javob umuman kelmaydi
+GET {{api}}/products?__fail=timeout
+
+
+# ─────────────────────────  XATO HOLATLARI  ─────────────────────────
+
+### 401 — tokensiz
+GET {{api}}/cart
+
+### 403 — oddiy user admin yo'lida
+GET {{api}}/admin/stats
+Authorization: Bearer {{token}}
+
+### 404 — bo'lmagan mahsulot
+GET {{api}}/products/bunday-mahsulot-yoq
+
+### 422 — validatsiya xatosi (details bilan)
+POST {{api}}/auth/register
+Content-Type: application/json
+
+{ "name": "A", "email": "email-emas", "password": "1" }
+
+### 409 — ombordan ko'p so'rash
+POST {{api}}/cart
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "productId": "{{productId}}", "quantity": 99 }
